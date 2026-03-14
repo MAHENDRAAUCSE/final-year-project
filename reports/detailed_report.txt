@@ -1,0 +1,47 @@
+
+    CNN + LSTM + ATTENTION MODEL - PERFORMANCE REPORT
+    ============================================================
+    Generated: 2026-02-26 13:25:12
+    
+    CONFIGURATION
+    ============================================================
+    Window Size: 30 days
+    Target Column: BOD (mg/L)
+    Train-Test Split: 80.0% - 19.999999999999996%
+    Batch Size: 32
+    Epochs: 100
+    Early Stopping Patience: 15
+    
+    PERFORMANCE METRICS
+    ============================================================
+    RMSE (mg/L): 14.4834
+    MAE (mg/L): 11.8191
+    R2 Score: 0.8289
+    MAPE (%): 7.3658
+    
+    DATA SUMMARY
+    ============================================================
+    Total Samples: 1461
+    Train Samples: 1168
+    Test Samples: 293
+    Sequences Generated: 263
+    
+    MODEL ARCHITECTURE
+    ============================================================
+    - 1D CNN: 64 filters, kernel 3, ReLU + BatchNorm
+    - 1D CNN: 32 filters, kernel 3, ReLU + MaxPool
+    - LSTM: 64 units, return_sequences=True
+    - LSTM: 32 units, return_sequences=True
+    - Attention: Focus on important timesteps
+    - Dense: 64 -> 32 -> 16 -> 1
+    - Optimizer: Adam (learning rate = 0.001)
+    - Loss: MSE
+    
+    INTERPRETATION
+    ============================================================
+    • R2 Score: Explains 82.89% variance in BOD predictions
+    • RMSE: Average prediction error is 14.48 mg/L
+    • MAE: Mean absolute error is 11.82 mg/L
+    • MAPE: Mean percentage error is 7.37%
+    
+    

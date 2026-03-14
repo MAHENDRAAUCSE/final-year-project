@@ -1,0 +1,26 @@
+CNN + LSTM + ATTENTION MODEL - PERFORMANCE REPORT
+============================================================
+Generated: 2026-03-12 10:38:23
+
+CONFIGURATION
+============================================================
+Window Size: 30 days
+Target Column: COD (mg/L)
+Train-Test Split: 80.0% - 19.999999999999996%
+Batch Size: 32
+Epochs: 100
+Early Stopping Patience: 15
+
+PERFORMANCE METRICS
+============================================================
+RMSE: 28.3680
+MAE: 22.9936
+R2 Score: 0.8343
+MAPE (%): 7.5561
+
+DATA SUMMARY
+============================================================
+Total Samples: 1461
+Train Samples: 1168
+Test Samples: 293
+Sequences Generated: 263
