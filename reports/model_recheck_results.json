@@ -1,0 +1,31 @@
+{
+  "target": "BOD (mg/L)",
+  "n_train_sequences": 1138,
+  "n_test_sequences": 263,
+  "experiments": [
+    {
+      "model": "CNN_LSTM_Attention_Current",
+      "epochs_ran": 22,
+      "RMSE": 23.442875471360036,
+      "MAE": 19.67371108646005,
+      "R2": 0.5517801775156588,
+      "MAPE": 11.242204635010749
+    },
+    {
+      "model": "BiLSTM_Residual_Attention_Candidate",
+      "epochs_ran": 13,
+      "RMSE": 18.124191867551055,
+      "MAE": 14.092758609220217,
+      "R2": 0.7320914337034847,
+      "MAPE": 8.42683606383039
+    }
+  ],
+  "best_by_rmse": {
+    "model": "BiLSTM_Residual_Attention_Candidate",
+    "epochs_ran": 13,
+    "RMSE": 18.124191867551055,
+    "MAE": 14.092758609220217,
+    "R2": 0.7320914337034847,
+    "MAPE": 8.42683606383039
+  }
+}

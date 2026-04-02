@@ -5,8 +5,8 @@ This project predicts wastewater treatment plant (STP) water-quality parameters 
 It includes:
 - A Python ML pipeline for training CNN-LSTM-Attention models.
 - Future forecasting scripts for next-day predictions.
-- A FastAPI backend for inference.
-- A Flutter app for uploading CSV data and viewing predictions.
+- A Streamlit web app for upload, forecasting, and visualization.
+- A FastAPI backend and Flutter app (legacy modules retained).
 
 ## Objectives
 
@@ -19,7 +19,8 @@ It includes:
 - Python 3.x
 - TensorFlow / Keras
 - NumPy, Pandas, scikit-learn, Matplotlib, Seaborn
-- FastAPI + Uvicorn
+- Streamlit
+- FastAPI + Uvicorn (legacy backend)
 - Flutter (Dart)
 
 ## Repository Structure
@@ -35,6 +36,10 @@ project_final/
 |   `-- ph_cnn_lstm_attention_model.h5
 |-- plots/
 |-- reports/
+|-- deploy/
+|   `-- streamlit/
+|       |-- app.py
+|       `-- inference.py
 |-- src/
 |   |-- cnn_lstm_attention.py
 |   `-- preprocessing.py
@@ -82,6 +87,28 @@ python -m venv .venv
 pip install -r requirements.txt
 ```
 
+## Streamlit Deployment (Primary)
+
+The project is now deployable as a Streamlit web app.
+
+Run from project root:
+
+```bash
+streamlit run deploy/streamlit/app.py
+```
+
+Default app URL:
+
+```text
+http://localhost:8501
+```
+
+What it supports:
+- CSV upload with STP historical data
+- Target selection (`BOD`, `COD`, `PH`, `DO`)
+- Configurable prediction horizon and time window
+- Forecast table, chart, and CSV download
+
 ## Model Training
 
 ### 1) Simple training (default BOD)
@@ -120,7 +147,7 @@ python future_prediction.py --target "BOD (mg/L)" --days 7 --time_steps 30
 
 The script writes an Excel file (for example `Future_BOD_Predictions.xlsx`) containing predictions and summary statistics.
 
-## Backend API (FastAPI)
+## Backend API (FastAPI - Legacy)
 
 Location: `smart_stp_predictor/backend`
 
@@ -143,7 +170,7 @@ uvicorn api:app --reload --host 0.0.0.0 --port 8000
 - Input: multipart file upload with key `file` (CSV)
 - Output: JSON with key `future_predictions` (7 predicted values)
 
-## Flutter Mobile App
+## Flutter Mobile App (Legacy)
 
 Location: `smart_stp_predictor/mobile_app`
 
