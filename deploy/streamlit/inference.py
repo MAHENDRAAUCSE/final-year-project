@@ -55,6 +55,17 @@ class CompatInputLayer(tf.keras.layers.InputLayer):
         return super().from_config(config)
 
 
+def _compat_custom_objects() -> Dict[str, object]:
+    # Keras version differences can serialize dtype policy as DTypePolicy or Policy.
+    policy_cls = tf.keras.mixed_precision.Policy
+    return {
+        "GetItem": GetItem,
+        "InputLayer": CompatInputLayer,
+        "DTypePolicy": policy_cls,
+        "Policy": policy_cls,
+    }
+
+
 def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -181,8 +192,9 @@ def resolve_model_path(target: str) -> Path:
 
 def load_prediction_model(target: str):
     model_path = resolve_model_path(target)
+    custom_objects = _compat_custom_objects()
     try:
-        model = load_model(model_path, compile=False)
+        model = load_model(model_path, custom_objects=custom_objects, compile=False)
     except Exception as exc:
         message = str(exc)
         if (
@@ -191,13 +203,12 @@ def load_prediction_model(target: str):
             or "InputLayer" in message
             or "batch_shape" in message
             or "optional" in message
+            or "Unknown dtype policy" in message
+            or "DTypePolicy" in message
         ):
             model = load_model(
                 model_path,
-                custom_objects={
-                    "GetItem": GetItem,
-                    "InputLayer": CompatInputLayer,
-                },
+                custom_objects=custom_objects,
                 compile=False,
             )
         else:
