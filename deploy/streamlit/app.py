@@ -1,5 +1,12 @@
 from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# Add project root to Python path so src/ and other modules are discoverable
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
