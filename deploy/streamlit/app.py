@@ -7,9 +7,13 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
+import io
 import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 from inference import (
     available_targets,
@@ -31,6 +35,163 @@ def render_residual_plot(residual_data: pd.DataFrame) -> None:
     ax.grid(True, alpha=0.25)
     st.pyplot(fig, width="stretch")
     plt.close(fig)
+
+
+def render_prediction_plot(result_df: pd.DataFrame, target_name: str) -> None:
+    """Create a professional prediction visualization."""
+    fig, ax = plt.subplots(figsize=(12, 5))
+    value_col = result_df.columns[1]
+    
+    ax.plot(result_df["Day"], result_df[value_col], marker="o", linewidth=2.5, 
+            markersize=7, color="#4CAF50", label=target_name)
+    ax.fill_between(result_df["Day"], result_df[value_col], alpha=0.2, color="#4CAF50")
+    
+    ax.set_title(f"7-Day Forecast: {target_name}", fontsize=14, fontweight="bold")
+    ax.set_xlabel("Day", fontsize=11)
+    ax.set_ylabel("Predicted Value (mg/L)", fontsize=11)
+    ax.grid(True, alpha=0.3, linestyle="--")
+    ax.legend(fontsize=10)
+    
+    st.pyplot(fig, width="stretch")
+    plt.close(fig)
+
+
+def create_excel_workbook(predictions: dict, all_targets: bool = False) -> bytes:
+    """Create a formatted Excel workbook with predictions."""
+    wb = Workbook()
+    wb.remove(wb.active)  # Remove default sheet
+    
+    if all_targets:
+        # Summary sheet
+        ws_summary = wb.create_sheet("Summary", 0)
+        ws_summary.append(["Smart STP Predictor - All Targets Forecast"])
+        ws_summary.append([])
+        
+        summary_data = []
+        for target in predictions.keys():
+            result_df = predictions[target][0]
+            value_col = result_df.columns[1]
+            summary_data.append({
+                "Target": target,
+                "Mean": f"{result_df[value_col].mean():.3f}",
+                "Min": f"{result_df[value_col].min():.3f}",
+                "Max": f"{result_df[value_col].max():.3f}",
+                "Day 1": f"{result_df[value_col].iloc[0]:.3f}",
+                "Day 7": f"{result_df[value_col].iloc[-1]:.3f}",
+            })
+        
+        summary_df = pd.DataFrame(summary_data)
+        for r_idx, row in enumerate(dataframe_to_rows(summary_df, index=False, header=True), 3):
+            for c_idx, value in enumerate(row, 1):
+                cell = ws_summary.cell(row=r_idx, column=c_idx, value=value)
+                if r_idx == 3:  # Header row
+                    cell.font = Font(bold=True, color="FFFFFF")
+                    cell.fill = PatternFill(start_color="1F4E78", end_color="1F4E78", fill_type="solid")
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Adjust column widths
+        for col in ws_summary.columns:
+            ws_summary.column_dimensions[col[0].column_letter].width = 15
+        
+        # Individual sheets for each target
+        for target in predictions.keys():
+            result_df, model_path = predictions[target]
+            ws = wb.create_sheet(target.split()[0])  # Use first word as sheet name
+            
+            # Header
+            ws.append([f"Forecast: {target}"])
+            ws.append([f"Model: {model_path}"])
+            ws.append([])
+            
+            # Data
+            for r_idx, row in enumerate(dataframe_to_rows(result_df, index=False, header=True), 4):
+                for c_idx, value in enumerate(row, 1):
+                    cell = ws.cell(row=r_idx, column=c_idx, value=value)
+                    if r_idx == 4:  # Header
+                        cell.font = Font(bold=True, color="FFFFFF")
+                        cell.fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+                    else:
+                        if c_idx > 1:  # Value columns
+                            cell.number_format = "0.000"
+                        cell.alignment = Alignment(horizontal="center")
+                    
+                    thin_border = Border(
+                        left=Side(style="thin"),
+                        right=Side(style="thin"),
+                        top=Side(style="thin"),
+                        bottom=Side(style="thin")
+                    )
+                    cell.border = thin_border
+            
+            # Adjust widths
+            ws.column_dimensions["A"].width = 12
+            ws.column_dimensions["B"].width = 20
+    else:
+        # Single target sheet
+        target = list(predictions.keys())[0]
+        result_df, model_path = predictions[target]
+        ws = wb.create_sheet("Forecast")
+        
+        # Header
+        header_cell = ws.append([f"Smart STP Predictor - {target}"])[0]
+        ws.append([f"Model: {model_path}"])
+        ws.append([])
+        
+        # Statistics
+        value_col = result_df.columns[1]
+        stats_rows = [
+            ["Statistic", "Value"],
+            ["Mean", f"{result_df[value_col].mean():.3f}"],
+            ["Minimum", f"{result_df[value_col].min():.3f}"],
+            ["Maximum", f"{result_df[value_col].max():.3f}"],
+            ["Day 1 Forecast", f"{result_df[value_col].iloc[0]:.3f}"],
+            ["Day 7 Forecast", f"{result_df[value_col].iloc[-1]:.3f}"],
+        ]
+        
+        for row in stats_rows:
+            ws.append(row)
+        
+        ws.append([])
+        ws.append(["Detailed Predictions"])
+        
+        # Data table
+        for r_idx, row in enumerate(dataframe_to_rows(result_df, index=False, header=True), 11):
+            for c_idx, value in enumerate(row, 1):
+                cell = ws.cell(row=r_idx, column=c_idx, value=value)
+                if r_idx == 11:  # Header
+                    cell.font = Font(bold=True, color="FFFFFF")
+                    cell.fill = PatternFill(start_color="70AD47", end_color="70AD47", fill_type="solid")
+                else:
+                    if c_idx > 1:
+                        cell.number_format = "0.000"
+                    cell.alignment = Alignment(horizontal="center")
+                
+                thin_border = Border(
+                    left=Side(style="thin"),
+                    right=Side(style="thin"),
+                    top=Side(style="thin"),
+                    bottom=Side(style="thin")
+                )
+                cell.border = thin_border
+        
+        # Format stats section
+        for row_idx in range(4, 10):
+            for col_idx in range(1, 3):
+                cell = ws.cell(row=row_idx, column=col_idx)
+                if col_idx == 1:
+                    cell.font = Font(bold=True)
+                    cell.fill = PatternFill(start_color="E7E6E6", end_color="E7E6E6", fill_type="solid")
+                if col_idx == 2:
+                    cell.number_format = "0.000"
+        
+        ws.column_dimensions["A"].width = 20
+        ws.column_dimensions["B"].width = 18
+    
+    # Save to bytes
+    output = io.BytesIO()
+    wb.save(output)
+    output.seek(0)
+    return output.getvalue()
 
 
 st.set_page_config(
@@ -190,7 +351,8 @@ if df is not None:
                     all_success = False
             
             if all_success and all_results:
-                st.success("Predictions completed successfully for all targets!")
+                st.success("✅ Predictions completed successfully for all targets!")
+                st.markdown("---")
                 
                 # Display results in tabs
                 tabs = st.tabs(list(all_results.keys()))
@@ -199,24 +361,31 @@ if df is not None:
                         result_df, model_path = all_results[target]
                         value_col = result_df.columns[1]
                         
-                        st.write(f"**Model:** {model_path}")
+                        st.subheader(f"📊 {target}")
+                        st.caption(f"Model: {model_path}")
                         
+                        # Metrics
                         metric_col1, metric_col2, metric_col3 = st.columns(3)
                         metric_col1.metric("Mean", f"{result_df[value_col].mean():.3f}")
                         metric_col2.metric("Min", f"{result_df[value_col].min():.3f}")
                         metric_col3.metric("Max", f"{result_df[value_col].max():.3f}")
                         
+                        # Plot
+                        render_prediction_plot(result_df, target)
+                        
+                        # Data table
+                        st.markdown("**Detailed Predictions**")
                         st.dataframe(result_df, width="stretch")
-                        st.line_chart(result_df.set_index("Day"))
                 
-                # Combined download button
-                combined_data = pd.concat([all_results[t][0].assign(Target=t) for t in all_results.keys()], ignore_index=True)
-                csv_bytes = combined_data.to_csv(index=False).encode("utf-8")
+                # Excel download with formatted data
+                st.markdown("---")
+                st.subheader("📥 Export Results")
+                excel_bytes = create_excel_workbook(all_results, all_targets=True)
                 st.download_button(
-                    label="Download All Predictions CSV",
-                    data=csv_bytes,
-                    file_name="stp_all_targets_predictions.csv",
-                    mime="text/csv",
+                    label="📊 Download All Predictions (Excel)",
+                    data=excel_bytes,
+                    file_name="stp_all_targets_predictions.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                 )
     else:
         if st.button("Run Prediction", type="primary"):
@@ -232,24 +401,32 @@ if df is not None:
                 st.stop()
 
             value_col = result_df.columns[1]
-            st.success("Prediction completed successfully.")
-            st.write(f"Model used: {model_path}")
+            st.success("✅ Prediction completed successfully!")
+            st.caption(f"Model: {model_path}")
+            st.markdown("---")
 
+            # Metrics
             metric_col1, metric_col2, metric_col3 = st.columns(3)
             metric_col1.metric("Mean", f"{result_df[value_col].mean():.3f}")
             metric_col2.metric("Min", f"{result_df[value_col].min():.3f}")
             metric_col3.metric("Max", f"{result_df[value_col].max():.3f}")
 
-            st.markdown("#### Forecast")
-            st.dataframe(result_df, width="stretch")
-            st.line_chart(result_df.set_index("Day"))
+            # Plot
+            st.markdown("### 📈 Forecast Visualization")
+            render_prediction_plot(result_df, selected_target)
 
-            csv_bytes = result_df.to_csv(index=False).encode("utf-8")
+            # Data table
+            st.markdown("### 📋 Detailed Forecast Data")
+            st.dataframe(result_df, width="stretch")
+            
+            st.markdown("---")
+            st.markdown("### 📥 Export Results")
+            excel_bytes = create_excel_workbook({selected_target: (result_df, model_path)}, all_targets=False)
             st.download_button(
-                label="Download Predictions CSV",
-                data=csv_bytes,
-                file_name="stp_future_predictions.csv",
-                mime="text/csv",
+                label="📊 Download Predictions (Excel)",
+                data=excel_bytes,
+                file_name="stp_future_predictions.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             )
 else:
     st.info("Upload a CSV file to start forecasting.")
