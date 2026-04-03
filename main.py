@@ -55,7 +55,9 @@ def build_output_paths(target_column):
     return {
         "metrics": f"reports/{slug}_metrics.json",
         "report": f"reports/{slug}_detailed_report.txt",
+        "model_keras": f"models/{slug}_cnn_lstm_attention_model.keras",
         "model": f"models/{slug}_cnn_lstm_attention_model.h5",
+        "weights": f"models/{slug}_cnn_lstm_attention_model.weights.h5",
         "plot_history": f"plots/{slug}_01_training_history.png",
         "plot_predictions": f"plots/{slug}_02_predictions_vs_actual.png",
         "plot_residuals": f"plots/{slug}_03_residuals.png",
@@ -223,8 +225,12 @@ Sequences Generated: {len(X_test)}
     print()
 
     print("STEP 11: Saving model...")
+    model.save(output_paths["model_keras"])
     model.save(output_paths["model"])
+    model.save_weights(output_paths["weights"])
+    print(f"Portable model saved to {output_paths['model_keras']}")
     print(f"Model saved to {output_paths['model']}")
+    print(f"Weights saved to {output_paths['weights']}")
     print()
 
     print("STEP 12: Generating plots...")

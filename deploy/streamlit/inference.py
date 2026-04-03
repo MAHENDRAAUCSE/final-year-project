@@ -7,63 +7,9 @@ import json
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 from sklearn.preprocessing import MinMaxScaler
-from tensorflow.keras.models import load_model
 
-
-class GetItem(tf.keras.layers.Layer):
-    """Compatibility layer for models saved with tensor getitem slicing."""
-
-    def __init__(self, s=None, index=None, **kwargs):
-        super().__init__(**kwargs)
-        self.s = s if s is not None else index
-
-    def __call__(self, inputs, *args, **kwargs):
-        if args:
-            kwargs.setdefault("s", args[0])
-        return super().__call__(inputs, **kwargs)
-
-    def call(self, inputs, s=None):
-        s = self.s if s is None else s
-        try:
-            return inputs[s]
-        except Exception:
-            if isinstance(s, int):
-                return inputs[:, s, :]
-            if isinstance(s, (list, tuple)) and len(s) >= 2:
-                idx = s[1]
-                if isinstance(idx, int):
-                    return inputs[:, idx, :]
-            raise
-
-    def get_config(self):
-        cfg = super().get_config()
-        cfg.update({"s": self.s})
-        return cfg
-
-
-class CompatInputLayer(tf.keras.layers.InputLayer):
-    """Compatibility InputLayer for older H5 configs across keras versions."""
-
-    @classmethod
-    def from_config(cls, config):
-        config = dict(config)
-        if "batch_shape" in config and "batch_input_shape" not in config:
-            config["batch_input_shape"] = config.pop("batch_shape")
-        config.pop("optional", None)
-        return super().from_config(config)
-
-
-def _compat_custom_objects() -> Dict[str, object]:
-    # Keras version differences can serialize dtype policy as DTypePolicy or Policy.
-    policy_cls = tf.keras.mixed_precision.Policy
-    return {
-        "GetItem": GetItem,
-        "InputLayer": CompatInputLayer,
-        "DTypePolicy": policy_cls,
-        "Policy": policy_cls,
-    }
+from src.model_compat import load_compatible_model
 
 
 def _project_root() -> Path:
@@ -85,17 +31,22 @@ def _normalize_target(target_name: str) -> str:
 
 TARGET_MODEL_CANDIDATES: Dict[str, List[Path]] = {
     "BOD (mg/L)": [
+        Path("models/cnn_lstm_attention_model.keras"),
         Path("models/cnn_lstm_attention_model.h5"),
+        Path("models/bod_cnn_lstm_attention_model.keras"),
         Path("models/bod_cnn_lstm_attention_model.h5"),
         Path("smart_stp_predictor/backend/models/bod_model.h5"),
     ],
     "COD (mg/L)": [
+        Path("models/cod_cnn_lstm_attention_model.keras"),
         Path("models/cod_cnn_lstm_attention_model.h5"),
     ],
     "PH": [
+        Path("models/ph_cnn_lstm_attention_model.keras"),
         Path("models/ph_cnn_lstm_attention_model.h5"),
     ],
     "DO (mg/L)": [
+        Path("models/do_cnn_lstm_attention_model.keras"),
         Path("models/do_cnn_lstm_attention_model.h5"),
     ],
 }
@@ -192,33 +143,7 @@ def resolve_model_path(target: str) -> Path:
 
 def load_prediction_model(target: str):
     model_path = resolve_model_path(target)
-    custom_objects = _compat_custom_objects()
-    try:
-        model = load_model(model_path, custom_objects=custom_objects, compile=False)
-    except Exception as exc:
-        message = str(exc)
-        if (
-            "GetItem" in message
-            or "Unknown layer" in message
-            or "InputLayer" in message
-            or "batch_shape" in message
-            or "optional" in message
-            or "Unknown dtype policy" in message
-            or "DTypePolicy" in message
-        ):
-            model = load_model(
-                model_path,
-                custom_objects=custom_objects,
-                compile=False,
-            )
-        else:
-            raise
-
-    try:
-        model.compile(optimizer="adam", loss="mse")
-    except Exception:
-        pass
-
+    model = load_compatible_model(model_path)
     return model, model_path
 
 

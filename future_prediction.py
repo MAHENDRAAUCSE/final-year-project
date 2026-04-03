@@ -3,9 +3,9 @@ import os
 import sys
 import numpy as np
 import pandas as pd
-import tensorflow as tf
-from tensorflow.keras.models import load_model
 from sklearn.preprocessing import MinMaxScaler
+
+from src.model_compat import load_compatible_model
 
 
 def find_target_column(df, target_name):
@@ -54,48 +54,6 @@ def prepare_scaler_and_data(df):
     scaler = MinMaxScaler()
     scaled = scaler.fit_transform(df_num.values)
     return scaler, scaled, df_num, numeric_cols
-
-
-class GetItem(tf.keras.layers.Layer):
-    """Compatibility layer for models saved with tensor getitem slicing.
-
-    This mirrors Keras' internal GetItem serialization so older saved .h5 models
-    that used slicing in-model (e.g. `x[:, -1, :]`) can be loaded.
-    """
-    def __init__(self, s=None, index=None, **kwargs):
-        super().__init__(**kwargs)
-        # serialized models may use 's' or 'index' in config
-        self.s = s if s is not None else index
-
-    def __call__(self, inputs, *args, **kwargs):
-        # Ensure non-tensor arguments are passed as keywords to the base layer
-        if args:
-            # treat first positional extra as 's'
-            kwargs.setdefault('s', args[0])
-        return super().__call__(inputs, **kwargs)
-
-    def call(self, inputs, s=None):
-        s = self.s if s is None else s
-        # Try direct indexing (works for many symbolic tensors)
-        try:
-            return inputs[s]
-        except Exception:
-            # handle simple common cases
-            if isinstance(s, int):
-                return inputs[:, s, :]
-            if isinstance(s, (list, tuple)) and len(s) >= 2:
-                # assume pattern like (slice(None), idx, slice(None))
-                idx = s[1]
-                if isinstance(idx, int):
-                    return inputs[:, idx, :]
-            # last resort: raise error to surface unexpected patterns
-            raise
-
-    def get_config(self):
-        cfg = super().get_config()
-        cfg.update({"s": self.s})
-        return cfg
-
 
 
 def predict_future(model, scaler, scaled_data, target_index, future_days, time_steps):
@@ -207,7 +165,9 @@ def main():
     # ensure model path is absolute or relative to script
     base = os.path.dirname(os.path.abspath(__file__))
     if args.model is None:
-        args.model = os.path.join(base, "models", f"{target_slug}_cnn_lstm_attention_model.h5")
+        keras_path = os.path.join(base, "models", f"{target_slug}_cnn_lstm_attention_model.keras")
+        h5_path = os.path.join(base, "models", f"{target_slug}_cnn_lstm_attention_model.h5")
+        args.model = keras_path if os.path.exists(keras_path) else h5_path
     elif not os.path.isabs(args.model):
         args.model = os.path.join(base, args.model)
     if not os.path.exists(args.model):
@@ -215,44 +175,7 @@ def main():
     if args.output is None:
         args.output = os.path.join(base, f"Future_{target_slug.upper()}_Predictions.xlsx")
 
-    # load without compiling to avoid issues with custom metrics/loss
-    # include GetItem for models that reference it
-    model = None
-    load_exc = None
-    try:
-        model = load_model(args.model, compile=False)
-    except Exception as e:
-        load_exc = e
-        msg = str(e)
-        if "GetItem" in msg or "Unknown layer" in msg:
-            try:
-                model = load_model(
-                    args.model,
-                    custom_objects={"GetItem": GetItem},
-                    compile=False,
-                )
-                load_exc = None
-            except Exception as e2:
-                load_exc = e2
-        # if still failed, we'll rebuild below
-    if model is None:
-        # fallback: construct architecture manually and load weights
-        print("Warning: failed to deserialize model, rebuilding architecture and loading weights")
-        try:
-            from src.cnn_lstm_attention import build_cnn_lstm_attention_model
-        except ImportError:
-            raise RuntimeError("Cannot import model builder from src/cnn_lstm_attention.py")
-        # need time_steps and n_features - derive after scaler prepared
-        # (we compute scaler and scaled earlier, so do it now)
-        time_steps = args.time_steps
-        n_features = scaled.shape[1]
-        model = build_cnn_lstm_attention_model((time_steps, n_features))
-        model.load_weights(args.model)
-    # compile model with default settings if needed (not required for inference)
-    try:
-        model.compile(optimizer="adam", loss="mse")
-    except Exception:
-        pass
+    model = load_compatible_model(args.model)
 
     future_days = args.days
     time_steps = args.time_steps
