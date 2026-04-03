@@ -43,6 +43,18 @@ class GetItem(tf.keras.layers.Layer):
         return cfg
 
 
+class CompatInputLayer(tf.keras.layers.InputLayer):
+    """Compatibility InputLayer for older H5 configs across keras versions."""
+
+    @classmethod
+    def from_config(cls, config):
+        config = dict(config)
+        if "batch_shape" in config and "batch_input_shape" not in config:
+            config["batch_input_shape"] = config.pop("batch_shape")
+        config.pop("optional", None)
+        return super().from_config(config)
+
+
 def _project_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -173,10 +185,19 @@ def load_prediction_model(target: str):
         model = load_model(model_path, compile=False)
     except Exception as exc:
         message = str(exc)
-        if "GetItem" in message or "Unknown layer" in message:
+        if (
+            "GetItem" in message
+            or "Unknown layer" in message
+            or "InputLayer" in message
+            or "batch_shape" in message
+            or "optional" in message
+        ):
             model = load_model(
                 model_path,
-                custom_objects={"GetItem": GetItem},
+                custom_objects={
+                    "GetItem": GetItem,
+                    "InputLayer": CompatInputLayer,
+                },
                 compile=False,
             )
         else:

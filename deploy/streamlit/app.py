@@ -22,7 +22,7 @@ def render_residual_plot(residual_data: pd.DataFrame) -> None:
     ax.set_xlabel("Sample Index")
     ax.set_ylabel("Residual (Actual - Predicted)")
     ax.grid(True, alpha=0.25)
-    st.pyplot(fig, use_container_width=True)
+    st.pyplot(fig, width="stretch")
     plt.close(fig)
 
 
@@ -68,7 +68,7 @@ if uploaded_file is not None:
         st.stop()
 
     st.markdown("#### Data Preview")
-    st.dataframe(df.head(20), use_container_width=True)
+    st.dataframe(df.head(20), width="stretch")
 
     try:
         residual_data, residual_metrics, residual_model_path = build_residual_analysis(
@@ -109,7 +109,7 @@ if df is not None:
         live_d.metric("Approx. Accuracy", f"{max(0.0, 100.0 - residual_metrics['MAPE (%)']):.2f}%")
 
         render_residual_plot(residual_data)
-        st.dataframe(residual_data.tail(20), use_container_width=True)
+        st.dataframe(residual_data.tail(20), width="stretch")
         st.caption(f"Residual analysis model: {residual_model_path}")
     else:
         st.warning(f"Residual plot could not be generated: {residual_error}")
@@ -118,13 +118,13 @@ evaluation_tabs = st.tabs(["Training History", "Predictions vs Actual", "Residua
 
 with evaluation_tabs[0]:
     if artifact_paths["training_history"].exists():
-        st.image(str(artifact_paths["training_history"]), use_container_width=True)
+        st.image(str(artifact_paths["training_history"]), width="stretch")
     else:
         st.info("Training history plot not available for this target.")
 
 with evaluation_tabs[1]:
     if artifact_paths["predictions"].exists():
-        st.image(str(artifact_paths["predictions"]), use_container_width=True)
+        st.image(str(artifact_paths["predictions"]), width="stretch")
     else:
         st.info("Predictions-vs-actual plot not available for this target.")
 
@@ -132,13 +132,13 @@ with evaluation_tabs[2]:
     if df is not None and residual_data is not None:
         render_residual_plot(residual_data)
     elif artifact_paths["residuals"].exists():
-        st.image(str(artifact_paths["residuals"]), use_container_width=True)
+        st.image(str(artifact_paths["residuals"]), width="stretch")
     else:
         st.info("Residual plot not available for this target.")
 
 with evaluation_tabs[3]:
     if artifact_paths["scatter"].exists():
-        st.image(str(artifact_paths["scatter"]), use_container_width=True)
+        st.image(str(artifact_paths["scatter"]), width="stretch")
     else:
         st.info("Scatter plot not available for this target.")
 
@@ -173,7 +173,7 @@ if df is not None:
         metric_col3.metric("Max", f"{result_df[value_col].max():.3f}")
 
         st.markdown("#### Forecast")
-        st.dataframe(result_df, use_container_width=True)
+        st.dataframe(result_df, width="stretch")
         st.line_chart(result_df.set_index("Day"))
 
         csv_bytes = result_df.to_csv(index=False).encode("utf-8")
